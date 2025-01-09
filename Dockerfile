@@ -16,3 +16,5 @@ FROM scratch AS runner
 COPY --from=builder /bin/evals .
 
 ENTRYPOINT [ "./evals" ]
+
+CMD [ "-i" , "/evals.txt" ]

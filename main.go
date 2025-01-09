@@ -3,7 +3,9 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"flag"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strings"
@@ -38,7 +40,22 @@ func main() {
 }
 
 func start() error {
-	scanner := bufio.NewScanner(os.Stdin)
+	input := flag.String("i", "-", "input file path, defaults to STDIN")
+	flag.Parse()
+
+	var inputReader io.Reader = os.Stdin
+	if input != nil && *input != "-" {
+		file, err := os.Open(*input)
+		if err != nil {
+			return fmt.Errorf("error opening input file: %w", err)
+		}
+		defer func() {
+			_ = file.Close()
+		}()
+		inputReader = file
+	}
+
+	scanner := bufio.NewScanner(inputReader)
 
 	var tableHeaderIsOutput bool
 
@@ -82,9 +99,11 @@ func start() error {
 		n++
 	}
 
-	// Print table footer with total score
-	fmt.Println("| | | | | | | |")
-	fmt.Printf("| **Total** | | | | | **%.2f** | **%v** |\n", float64(score)/float64(n), duration)
+	if tableHeaderIsOutput {
+		// Print table footer with total score
+		fmt.Println("| | | | | | | |")
+		fmt.Printf("| **Total** | | | | | **%.2f** | **%v** |\n", float64(score)/float64(n), duration)
+	}
 
 	return nil
 }
