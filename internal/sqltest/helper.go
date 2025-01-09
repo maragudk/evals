@@ -9,15 +9,6 @@ import (
 	"maragu.dev/evals/internal/sql"
 )
 
-type testWriter struct {
-	t *testing.T
-}
-
-func (t *testWriter) Write(p []byte) (n int, err error) {
-	t.t.Log(string(p))
-	return len(p), nil
-}
-
 // NewHelper for testing.
 func NewHelper(t *testing.T) *sql.Helper {
 	t.Helper()
