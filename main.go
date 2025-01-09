@@ -42,6 +42,10 @@ func start() error {
 
 	var tableHeaderIsOutput bool
 
+	var score eval.Score
+	var duration time.Duration
+	var n int
+
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		var gtl goTestLine
@@ -72,6 +76,15 @@ func start() error {
 
 		fmt.Printf("| %s | %s | %s | %s | %s | %.2f | %d |\n",
 			gtl.Test, ell.Sample.Input, ell.Sample.Expected, ell.Sample.Output, ell.Result.Type, ell.Result.Score, ell.Duration.Milliseconds())
+
+		score += ell.Result.Score
+		duration += ell.Duration
+		n++
 	}
+
+	// Print table footer with total score
+	fmt.Println("| | | | | | | |")
+	fmt.Printf("| **Total** | | | | | **%.2f** | **%d** |\n", float64(score)/float64(n), duration.Milliseconds())
+
 	return nil
 }
