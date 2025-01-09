@@ -1,6 +1,7 @@
 # evals
 
-[![Go](https://github.com/maragudk/evals/actions/workflows/ci.yml/badge.svg)](https://github.com/maragudk/evals/actions/workflows/ci.yml)
+[![CI](https://github.com/maragudk/evals/actions/workflows/ci.yml/badge.svg)](https://github.com/maragudk/evals/actions/workflows/ci.yml)
+[![CD](https://github.com/maragudk/evals/actions/workflows/cd.yml/badge.svg)](https://github.com/maragudk/evals/actions/workflows/cd.yml)
 
 A CLI to work with evals.
 
