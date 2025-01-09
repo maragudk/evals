@@ -74,8 +74,8 @@ func start() error {
 			tableHeaderIsOutput = true
 		}
 
-		fmt.Printf("| %s | %s | %s | %s | %s | %.2f | %d |\n",
-			gtl.Test, ell.Sample.Input, ell.Sample.Expected, ell.Sample.Output, ell.Result.Type, ell.Result.Score, ell.Duration.Milliseconds())
+		fmt.Printf("| %s | %s | %s | %s | %s | %.2f | %v |\n",
+			gtl.Test, ell.Sample.Input, ell.Sample.Expected, ell.Sample.Output, ell.Result.Type, ell.Result.Score, ell.Duration)
 
 		score += ell.Result.Score
 		duration += ell.Duration
@@ -84,7 +84,7 @@ func start() error {
 
 	// Print table footer with total score
 	fmt.Println("| | | | | | | |")
-	fmt.Printf("| **Total** | | | | | **%.2f** | **%d** |\n", float64(score)/float64(n), duration.Milliseconds())
+	fmt.Printf("| **Total** | | | | | **%.2f** | **%v** |\n", float64(score)/float64(n), duration)
 
 	return nil
 }
