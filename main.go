@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -85,6 +86,15 @@ func start() error {
 			continue
 		}
 
+		var previousScore eval.Score
+		var newScore bool
+		if err := h.Get(ctx, &previousScore, `select score from evals where name = ? order by experiment desc limit 1`, ell.Name); err != nil {
+			if !errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("error getting previous score from database: %w", err)
+			}
+			newScore = true
+		}
+
 		if !tableHeaderIsOutput {
 			fmt.Println("| Name | Input | Expected | Output | Type | Score | Duration |")
 			fmt.Println("| --- | --- | --- | --- | --- | --: | --: |")
@@ -105,8 +115,20 @@ func start() error {
 			output = ell.Sample.Output[:50] + "…"
 		}
 
-		fmt.Printf("| %s | %s | %s | %s | %s | %.2f | %v |\n",
-			ell.Name, input, expected, output, ell.Result.Type, ell.Result.Score, ell.Duration)
+		var scoreChange string
+		switch {
+		case newScore:
+			scoreChange = "🆕"
+		case previousScore < ell.Result.Score:
+			scoreChange = "↗️"
+		case previousScore > ell.Result.Score:
+			scoreChange = "↘️"
+		case previousScore == ell.Result.Score:
+			scoreChange = "➡️"
+		}
+
+		fmt.Printf("| %s | %s | %s | %s | %s | %.2f %v | %v |\n",
+			ell.Name, input, expected, output, ell.Result.Type, ell.Result.Score, scoreChange, ell.Duration)
 
 		err := h.Exec(ctx, `insert into evals (experiment, name, input, expected, output, type, score, duration) values (?, ?, ?, ?, ?, ?, ?, ?)`,
 			*experiment, ell.Name, ell.Sample.Input, ell.Sample.Expected, ell.Sample.Output, ell.Result.Type, ell.Result.Score, ell.Duration)
