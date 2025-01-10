@@ -26,7 +26,7 @@ type goTestLine struct {
 
 // goTestOutputMatcher matches JSON output from the Go test line.
 // See https://regex101.com/r/j5iQuq/latest
-var goTestOutputMatcher = regexp.MustCompile(`\s+[\w.]+:\d+:\s(.+)`)
+var goTestOutputMatcher = regexp.MustCompile(`\s+[\w.]+:\d+:\s({.+)`)
 
 type evalLogLine struct {
 	Sample   eval.Sample
