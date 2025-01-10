@@ -23,7 +23,7 @@ var goTestOutputMatcher = regexp.MustCompile(`\s+[\w.]+:\d+:\s((?s:.+))`)
 
 const (
 	prefix = "EVALRESULT🌜"
-	suffix = "🌛EVALRESULT"
+	suffix = "🌛EVALRESULT\n"
 )
 
 type EvalLogLine struct {
@@ -55,7 +55,7 @@ func (p *Parser) Parse(line string) (EvalLogLine, bool) {
 		return EvalLogLine{}, false
 	}
 
-	match := strings.TrimSpace(matches[1])
+	match := matches[1]
 
 	if strings.HasPrefix(match, prefix) && strings.HasSuffix(match, suffix) {
 		match = strings.TrimPrefix(match, prefix)
@@ -64,6 +64,7 @@ func (p *Parser) Parse(line string) (EvalLogLine, bool) {
 		if err := json.Unmarshal([]byte(match), &ell); err != nil {
 			panic(err)
 		}
+		ell.Name = gtl.Test
 		return ell, true
 	}
 
