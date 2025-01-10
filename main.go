@@ -61,6 +61,11 @@ func start() error {
 		inputReader = file
 	}
 
+	if experiment == nil || *experiment == "" {
+		// set the experiment name to the current time
+		*experiment = time.Now().Format(time.RFC3339)
+	}
+
 	h := sql.NewHelper(sql.NewHelperOptions{Path: *db})
 	if err := h.Connect(); err != nil {
 		return fmt.Errorf("error connecting to database: %w", err)
