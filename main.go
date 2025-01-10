@@ -3,17 +3,16 @@ package main
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"os"
-	"regexp"
-	"strings"
 	"time"
 
-	"maragu.dev/evals/internal/sql"
 	"maragu.dev/llm/eval"
+
+	"maragu.dev/evals/internal/sql"
+	"maragu.dev/evals/internal/text"
 )
 
 type goTestLine struct {
@@ -23,10 +22,6 @@ type goTestLine struct {
 	Test    string
 	Output  string
 }
-
-// goTestOutputMatcher matches JSON output from the Go test line.
-// See https://regex101.com/r/j5iQuq/latest
-var goTestOutputMatcher = regexp.MustCompile(`\s+[\w.]+:\d+:\s({.+)`)
 
 type evalLogLine struct {
 	Sample   eval.Sample
@@ -82,26 +77,12 @@ func start() error {
 	var duration time.Duration
 	var n int
 
+	parser := &text.Parser{}
+
 	for scanner.Scan() {
-		line := scanner.Bytes()
-		var gtl goTestLine
-		if err := json.Unmarshal(line, &gtl); err != nil {
-			return fmt.Errorf("error unmarshalling line: %w", err)
-		}
-
-		if gtl.Action != "output" || !strings.HasPrefix(gtl.Test, "TestEval") {
+		ell, ok := parser.Parse(scanner.Text())
+		if !ok {
 			continue
-		}
-
-		if !goTestOutputMatcher.MatchString(gtl.Output) {
-			continue
-		}
-
-		matches := goTestOutputMatcher.FindStringSubmatch(gtl.Output)
-
-		var ell evalLogLine
-		if err := json.Unmarshal([]byte(matches[1]), &ell); err != nil {
-			return fmt.Errorf("error unmarshalling eval log line: %w", err)
 		}
 
 		if !tableHeaderIsOutput {
@@ -110,11 +91,25 @@ func start() error {
 			tableHeaderIsOutput = true
 		}
 
+		// Set a max length for the strings in the markdown table
+		input := ell.Sample.Input
+		expected := ell.Sample.Expected
+		output := ell.Sample.Output
+		if len(ell.Sample.Input) > 50 {
+			input = ell.Sample.Input[:50] + "…"
+		}
+		if len(ell.Sample.Expected) > 50 {
+			expected = ell.Sample.Expected[:50] + "…"
+		}
+		if len(ell.Sample.Output) > 50 {
+			output = ell.Sample.Output[:50] + "…"
+		}
+
 		fmt.Printf("| %s | %s | %s | %s | %s | %.2f | %v |\n",
-			gtl.Test, ell.Sample.Input, ell.Sample.Expected, ell.Sample.Output, ell.Result.Type, ell.Result.Score, ell.Duration)
+			ell.Name, input, expected, output, ell.Result.Type, ell.Result.Score, ell.Duration)
 
 		err := h.Exec(ctx, `insert into evals (experiment, name, input, expected, output, type, score, duration) values (?, ?, ?, ?, ?, ?, ?, ?)`,
-			*experiment, gtl.Test, ell.Sample.Input, ell.Sample.Expected, ell.Sample.Output, ell.Result.Type, ell.Result.Score, ell.Duration)
+			*experiment, ell.Name, ell.Sample.Input, ell.Sample.Expected, ell.Sample.Output, ell.Result.Type, ell.Result.Score, ell.Duration)
 		if err != nil {
 			return fmt.Errorf("error inserting eval into database: %w", err)
 		}
