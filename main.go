@@ -11,17 +11,28 @@ import (
 	"os"
 	"time"
 
-	"maragu.dev/llm/eval"
-
 	"maragu.dev/evals/internal/sql"
 )
 
 type evalLogLine struct {
 	Name     string
-	Sample   eval.Sample
-	Result   eval.Result
+	Sample   Sample
+	Result   Result
 	Duration time.Duration
 }
+
+type Sample struct {
+	Expected string
+	Input    string
+	Output   string
+}
+
+type Result struct {
+	Score Score
+	Type  string
+}
+
+type Score float64
 
 func main() {
 	if err := start(); err != nil {
@@ -65,7 +76,7 @@ func start() error {
 
 	scanner := bufio.NewScanner(inputReader)
 
-	var score eval.Score
+	var score Score
 	var duration time.Duration
 	var n int
 
@@ -76,7 +87,7 @@ func start() error {
 			return fmt.Errorf("error unmarshalling line: %w", err)
 		}
 
-		var previousScore eval.Score
+		var previousScore Score
 		var newScore bool
 		if err := h.Get(ctx, &previousScore, `select score from evals where name = ? order by experiment desc limit 1`, ell.Name); err != nil {
 			if !errors.Is(err, sql.ErrNoRows) {
