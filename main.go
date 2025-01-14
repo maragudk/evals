@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -13,18 +14,10 @@ import (
 	"maragu.dev/llm/eval"
 
 	"maragu.dev/evals/internal/sql"
-	"maragu.dev/evals/internal/text"
 )
 
-type goTestLine struct {
-	Time    time.Time
-	Action  string
-	Package string
-	Test    string
-	Output  string
-}
-
 type evalLogLine struct {
+	Name     string
 	Sample   eval.Sample
 	Result   eval.Result
 	Duration time.Duration
@@ -40,7 +33,7 @@ func main() {
 func start() error {
 	ctx := context.Background()
 
-	input := flag.String("i", "-", "input file path, defaults to STDIN")
+	input := flag.String("i", "evals.jsonl", "input file path")
 	experiment := flag.String("e", "", "experiment name")
 	db := flag.String("db", "evals.db", "database file path, created if not exists")
 	flag.Parse()
@@ -72,18 +65,15 @@ func start() error {
 
 	scanner := bufio.NewScanner(inputReader)
 
-	var tableHeaderIsOutput bool
-
 	var score eval.Score
 	var duration time.Duration
 	var n int
 
-	parser := &text.Parser{}
-
 	for scanner.Scan() {
-		ell, ok := parser.Parse(scanner.Text())
-		if !ok {
-			continue
+		var ell evalLogLine
+		b := scanner.Bytes()
+		if err := json.Unmarshal(b, &ell); err != nil {
+			return fmt.Errorf("error unmarshalling line: %w", err)
 		}
 
 		var previousScore eval.Score
@@ -95,10 +85,9 @@ func start() error {
 			newScore = true
 		}
 
-		if !tableHeaderIsOutput {
+		if n == 0 {
 			fmt.Println("| Name | Input | Expected | Output | Type | Score | Duration |")
 			fmt.Println("| --- | --- | --- | --- | --- | --: | --: |")
-			tableHeaderIsOutput = true
 		}
 
 		// Set a max length for the strings in the markdown table
@@ -141,7 +130,7 @@ func start() error {
 		n++
 	}
 
-	if tableHeaderIsOutput {
+	if n > 0 {
 		// Print table footer with total score
 		fmt.Println("| | | | | | | |")
 		fmt.Printf("| **Total** | | | | | **%.2f** | **%v** |\n", float64(score)/float64(n), duration)
