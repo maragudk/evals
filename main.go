@@ -89,7 +89,7 @@ func start() error {
 
 		var previousScore Score
 		var newScore bool
-		if err := h.Get(ctx, &previousScore, `select score from evals where name = ? order by experiment desc limit 1`, ell.Name); err != nil {
+		if err := h.Get(ctx, &previousScore, `select score from evals where name = ? and type = ? order by experiment desc limit 1`, ell.Name, ell.Result.Type); err != nil {
 			if !errors.Is(err, sql.ErrNoRows) {
 				return fmt.Errorf("error getting previous score from database: %w", err)
 			}
