@@ -97,22 +97,8 @@ func start() error {
 		}
 
 		if n == 0 {
-			fmt.Println("| Name | Input | Expected | Output | Type | Score | Duration |")
-			fmt.Println("| --- | --- | --- | --- | --- | --: | --: |")
-		}
-
-		// Set a max length for the strings in the markdown table
-		input := ell.Sample.Input
-		expected := ell.Sample.Expected
-		output := ell.Sample.Output
-		if len(ell.Sample.Input) > 50 {
-			input = ell.Sample.Input[:50] + "…"
-		}
-		if len(ell.Sample.Expected) > 50 {
-			expected = ell.Sample.Expected[:50] + "…"
-		}
-		if len(ell.Sample.Output) > 50 {
-			output = ell.Sample.Output[:50] + "…"
+			fmt.Println("| Name | Type | Score | Duration |")
+			fmt.Println("| --- | --- | --: | --: |")
 		}
 
 		var scoreChange string
@@ -127,8 +113,7 @@ func start() error {
 			scoreChange = "➡️"
 		}
 
-		fmt.Printf("| %s | %s | %s | %s | %s | %.2f %v | %v |\n",
-			ell.Name, input, expected, output, ell.Result.Type, ell.Result.Score, scoreChange, ell.Duration)
+		fmt.Printf("| %s | %s | %.2f %v | %v |\n", ell.Name, ell.Result.Type, ell.Result.Score, scoreChange, ell.Duration)
 
 		err := h.Exec(ctx, `insert into evals (experiment, name, input, expected, output, type, score, duration) values (?, ?, ?, ?, ?, ?, ?, ?)`,
 			*experiment, ell.Name, ell.Sample.Input, ell.Sample.Expected, ell.Sample.Output, ell.Result.Type, ell.Result.Score, ell.Duration)
@@ -143,7 +128,6 @@ func start() error {
 
 	if n > 0 {
 		// Print table footer with total score
-		fmt.Println("| | | | | | | |")
 		fmt.Printf("| **Total** | | | | | **%.2f** | **%v** |\n", float64(score)/float64(n), duration)
 	}
 
