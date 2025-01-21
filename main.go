@@ -76,8 +76,8 @@ func start() error {
 
 	scanner := bufio.NewScanner(inputReader)
 
-	var score Score
-	var duration time.Duration
+	var totalScore Score
+	var totalDuration time.Duration
 	var n int
 
 	for scanner.Scan() {
@@ -121,14 +121,14 @@ func start() error {
 			return fmt.Errorf("error inserting eval into database: %w", err)
 		}
 
-		score += ell.Result.Score
-		duration += ell.Duration
+		totalScore += ell.Result.Score
+		totalDuration += ell.Duration
 		n++
 	}
 
 	if n > 0 {
 		// Print table footer with total score
-		fmt.Printf("| **Total** | | | | | **%.2f** | **%v** |\n", float64(score)/float64(n), duration)
+		fmt.Printf("| **Total** | | **%.2f** | **%v** |\n", float64(totalScore)/float64(n), roundDuration(totalDuration))
 	}
 
 	return nil
@@ -138,5 +138,5 @@ func roundDuration(v time.Duration) time.Duration {
 	if v < time.Second {
 		return v.Round(time.Millisecond)
 	}
-	return v.Round(time.Second)
+	return v.Round(100 * time.Millisecond)
 }
