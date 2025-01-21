@@ -113,7 +113,7 @@ func start() error {
 			scoreChange = "➡️"
 		}
 
-		fmt.Printf("| %s | %s | %.2f %v | %v |\n", ell.Name, ell.Result.Type, ell.Result.Score, scoreChange, ell.Duration)
+		fmt.Printf("| %s | %s | %.2f %v | %v |\n", ell.Name, ell.Result.Type, ell.Result.Score, scoreChange, roundDuration(ell.Duration))
 
 		err := h.Exec(ctx, `insert into evals (experiment, name, input, expected, output, type, score, duration) values (?, ?, ?, ?, ?, ?, ?, ?)`,
 			*experiment, ell.Name, ell.Sample.Input, ell.Sample.Expected, ell.Sample.Output, ell.Result.Type, ell.Result.Score, ell.Duration)
@@ -132,4 +132,11 @@ func start() error {
 	}
 
 	return nil
+}
+
+func roundDuration(v time.Duration) time.Duration {
+	if v < time.Second {
+		return v.Round(time.Millisecond)
+	}
+	return v.Round(time.Second)
 }
