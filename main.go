@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"time"
 
 	"maragu.dev/evals/internal/sql"
@@ -80,6 +81,8 @@ func start() error {
 	var totalDuration time.Duration
 	var n int
 
+	var outputLines []string
+
 	for scanner.Scan() {
 		var ell evalLogLine
 		b := scanner.Bytes()
@@ -111,7 +114,8 @@ func start() error {
 			scoreChange = fmt.Sprintf(" (-%.2f)", previousScore-ell.Result.Score)
 		}
 
-		fmt.Printf("| %s | %s | %.2f %v | %v |\n", ell.Name, ell.Result.Type, ell.Result.Score, scoreChange, roundDuration(ell.Duration))
+		outputLine := fmt.Sprintf("| %s | %s | %.2f %v | %v |\n", ell.Name, ell.Result.Type, ell.Result.Score, scoreChange, roundDuration(ell.Duration))
+		outputLines = append(outputLines, outputLine)
 
 		err := h.Exec(ctx, `insert into evals (experiment, name, input, expected, output, type, score, duration) values (?, ?, ?, ?, ?, ?, ?, ?)`,
 			*experiment, ell.Name, ell.Sample.Input, ell.Sample.Expected, ell.Sample.Output, ell.Result.Type, ell.Result.Score, ell.Duration)
@@ -122,6 +126,12 @@ func start() error {
 		totalScore += ell.Result.Score
 		totalDuration += ell.Duration
 		n++
+	}
+
+	// Sort output lines by name, type
+	slices.Sort(outputLines)
+	for _, line := range outputLines {
+		fmt.Print(line)
 	}
 
 	if n > 0 {
