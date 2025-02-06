@@ -98,19 +98,17 @@ func start() error {
 
 		if n == 0 {
 			fmt.Println("| Name | Type | Score | Duration |")
-			fmt.Println("| --- | --- | --: | --: |")
+			fmt.Println("| --- | --- | --- | --: |")
 		}
 
 		var scoreChange string
 		switch {
 		case newScore:
-			scoreChange = "🆕"
-		case previousScore < ell.Result.Score:
-			scoreChange = "↗️"
-		case previousScore > ell.Result.Score:
-			scoreChange = "↘️"
-		case previousScore == ell.Result.Score:
-			scoreChange = "➡️"
+			scoreChange = " (new)"
+		case ell.Result.Score-previousScore >= 0.005:
+			scoreChange = fmt.Sprintf(" (+%.2f)", ell.Result.Score-previousScore)
+		case previousScore-ell.Result.Score >= 0.005:
+			scoreChange = fmt.Sprintf(" (-%.2f)", previousScore-ell.Result.Score)
 		}
 
 		fmt.Printf("| %s | %s | %.2f %v | %v |\n", ell.Name, ell.Result.Type, ell.Result.Score, scoreChange, roundDuration(ell.Duration))
