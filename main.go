@@ -18,7 +18,7 @@ import (
 type evalLogLine struct {
 	Name     string
 	Sample   Sample
-	Result   Result
+	Results  []Result
 	Duration time.Duration
 }
 
@@ -78,7 +78,6 @@ func start() error {
 	scanner := bufio.NewScanner(inputReader)
 
 	var totalScore Score
-	var totalDuration time.Duration
 	var n int
 
 	var outputLines []string
@@ -90,42 +89,43 @@ func start() error {
 			return fmt.Errorf("error unmarshalling line: %w", err)
 		}
 
-		var previousScore Score
-		var newScore bool
-		if err := h.Get(ctx, &previousScore, `select score from evals where name = ? and type = ? order by experiment desc limit 1`, ell.Name, ell.Result.Type); err != nil {
-			if !errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("error getting previous score from database: %w", err)
+		for _, result := range ell.Results {
+			var previousScore Score
+			var newScore bool
+			if err := h.Get(ctx, &previousScore, `select score from evals where name = ? and type = ? order by experiment desc limit 1`, ell.Name, result.Type); err != nil {
+				if !errors.Is(err, sql.ErrNoRows) {
+					return fmt.Errorf("error getting previous score from database: %w", err)
+				}
+				newScore = true
 			}
-			newScore = true
+
+			if n == 0 {
+				fmt.Println("| Name | Type | Score | Duration |")
+				fmt.Println("| --- | --- | --- | --: |")
+			}
+
+			var scoreChange string
+			switch {
+			case newScore:
+				scoreChange = " (new)"
+			case result.Score-previousScore >= 0.005:
+				scoreChange = fmt.Sprintf(" (+%.2f)", result.Score-previousScore)
+			case previousScore-result.Score >= 0.005:
+				scoreChange = fmt.Sprintf(" (-%.2f)", previousScore-result.Score)
+			}
+
+			outputLine := fmt.Sprintf("| %s | %s | %.2f %v | %v |\n", ell.Name, result.Type, result.Score, scoreChange, roundDuration(ell.Duration))
+			outputLines = append(outputLines, outputLine)
+
+			err := h.Exec(ctx, `insert into evals (experiment, name, input, expected, output, type, score, duration) values (?, ?, ?, ?, ?, ?, ?, ?)`,
+				*experiment, ell.Name, ell.Sample.Input, ell.Sample.Expected, ell.Sample.Output, result.Type, result.Score, ell.Duration)
+			if err != nil {
+				return fmt.Errorf("error inserting eval into database: %w", err)
+			}
+
+			totalScore += result.Score
+			n++
 		}
-
-		if n == 0 {
-			fmt.Println("| Name | Type | Score | Duration |")
-			fmt.Println("| --- | --- | --- | --: |")
-		}
-
-		var scoreChange string
-		switch {
-		case newScore:
-			scoreChange = " (new)"
-		case ell.Result.Score-previousScore >= 0.005:
-			scoreChange = fmt.Sprintf(" (+%.2f)", ell.Result.Score-previousScore)
-		case previousScore-ell.Result.Score >= 0.005:
-			scoreChange = fmt.Sprintf(" (-%.2f)", previousScore-ell.Result.Score)
-		}
-
-		outputLine := fmt.Sprintf("| %s | %s | %.2f %v | %v |\n", ell.Name, ell.Result.Type, ell.Result.Score, scoreChange, roundDuration(ell.Duration))
-		outputLines = append(outputLines, outputLine)
-
-		err := h.Exec(ctx, `insert into evals (experiment, name, input, expected, output, type, score, duration) values (?, ?, ?, ?, ?, ?, ?, ?)`,
-			*experiment, ell.Name, ell.Sample.Input, ell.Sample.Expected, ell.Sample.Output, ell.Result.Type, ell.Result.Score, ell.Duration)
-		if err != nil {
-			return fmt.Errorf("error inserting eval into database: %w", err)
-		}
-
-		totalScore += ell.Result.Score
-		totalDuration += ell.Duration
-		n++
 	}
 
 	// Sort output lines by name, type
@@ -136,7 +136,7 @@ func start() error {
 
 	if n > 0 {
 		// Print table footer with total score
-		fmt.Printf("| **Total** | | **%.2f** | **%v** |\n", float64(totalScore)/float64(n), roundDuration(totalDuration))
+		fmt.Printf("| **Total** | | **%.2f** | |\n", float64(totalScore)/float64(n))
 	}
 
 	return nil
