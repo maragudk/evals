@@ -2,12 +2,14 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"slices"
 	"time"
@@ -15,8 +17,14 @@ import (
 	"maragu.dev/evals/internal/sql"
 )
 
+type evalsFunRequest struct {
+	Branch string
+	Evals  []evalLogLine
+}
+
 type evalLogLine struct {
 	Name     string
+	Group    string
 	Sample   Sample
 	Results  []Result
 	Duration time.Duration
@@ -48,6 +56,7 @@ func start() error {
 	input := flag.String("i", "evals.jsonl", "input file path")
 	experiment := flag.String("e", "", "experiment name")
 	db := flag.String("db", "evals.db", "database file path, created if not exists")
+	branch := flag.String("branch", "main", "branch name")
 	flag.Parse()
 
 	var inputReader io.Reader = os.Stdin
@@ -80,6 +89,7 @@ func start() error {
 	var totalScore Score
 	var n int
 
+	var ells []evalLogLine
 	var outputLines []string
 
 	for scanner.Scan() {
@@ -88,6 +98,8 @@ func start() error {
 		if err := json.Unmarshal(b, &ell); err != nil {
 			return fmt.Errorf("error unmarshalling line: %w", err)
 		}
+
+		ells = append(ells, ell)
 
 		for _, result := range ell.Results {
 			var previousScore Score
@@ -117,8 +129,8 @@ func start() error {
 			outputLine := fmt.Sprintf("| %s | %s | %.2f %v | %v |\n", ell.Name, result.Type, result.Score, scoreChange, roundDuration(ell.Duration))
 			outputLines = append(outputLines, outputLine)
 
-			err := h.Exec(ctx, `insert into evals (experiment, name, input, expected, output, type, score, duration) values (?, ?, ?, ?, ?, ?, ?, ?)`,
-				*experiment, ell.Name, ell.Sample.Input, ell.Sample.Expected, ell.Sample.Output, result.Type, result.Score, ell.Duration)
+			err := h.Exec(ctx, `insert into evals (experiment, "group", name, input, expected, output, type, score, duration) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				*experiment, ell.Group, ell.Name, ell.Sample.Input, ell.Sample.Expected, ell.Sample.Output, result.Type, result.Score, ell.Duration)
 			if err != nil {
 				return fmt.Errorf("error inserting eval into database: %w", err)
 			}
@@ -137,6 +149,36 @@ func start() error {
 	if n > 0 {
 		// Print table footer with total score
 		fmt.Printf("| **Total** | | **%.2f** | |\n", float64(totalScore)/float64(n))
+
+		if evalsFunSecretKey, ok := os.LookupEnv("EVALS_FUN_SECRET_KEY"); ok {
+			for range 10 {
+				reqBody := evalsFunRequest{
+					Branch: *branch,
+					Evals:  ells,
+				}
+				b, err := json.Marshal(reqBody)
+				if err != nil {
+					return fmt.Errorf("error marshalling evals.fun request body: %w", err)
+				}
+				req, err := http.NewRequest(http.MethodPost, "https://api.evals.fun/evals", bytes.NewReader(b))
+				if err != nil {
+					return fmt.Errorf("error creating evals.fun request: %w", err)
+				}
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("Authorization", "Bearer "+evalsFunSecretKey)
+				http.DefaultClient.Timeout = 10 * time.Second
+				res, err := http.DefaultClient.Do(req)
+				if err != nil {
+					fmt.Fprintln(os.Stderr, "error sending evals.fun request:", err)
+					continue
+				}
+				if res.StatusCode != http.StatusCreated {
+					fmt.Fprintln(os.Stderr, "error sending evals.fun request:", res.Status)
+					continue
+				}
+				break
+			}
+		}
 	}
 
 	return nil
